@@ -71,13 +71,15 @@
     <div class="manifest-grid" id="manifest-grid"></div>
   </div>
 
-  <footer>Napa Home &copy; 2026 — Decorating Generator</footer>
+  <footer>Napa Home &copy; 2026 — Tablescape Generator</footer>
 </div>
 
 <script>
 const BASE = 'https://cdn.jsdelivr.net/gh/robert856/napa-home-assets@main/';
-const SURFACE = 56;
-const INSET_PX = 25;
+const SURFACE  = 56;
+const FURN_L   = 10;
+const FURN_R   = 90;
+const ITEM_W   = 18;
 
 const ASSETS = {
   furniture: [
@@ -159,42 +161,15 @@ function makeImg(file, styles) {
   return img;
 }
 
-function placeOnSurface(stage, vesselFile, accessorFile) {
-  const furnImg = stage.querySelector('[data-role="furniture"]');
-  if (!furnImg) return;
-  const stageRect = stage.getBoundingClientRect();
-  const furnRect  = furnImg.getBoundingClientRect();
-  const stageW    = stageRect.width;
-  const furnLeftPx  = furnRect.left  - stageRect.left;
-  const furnRightPx = furnRect.right - stageRect.left;
-  const vesWidthPct = 15;
-  const accWidthPct = 16;
-  const vesLeftPct  = ((furnLeftPx + INSET_PX) / stageW) * 100;
-  const accLeftPct  = (((furnRightPx - INSET_PX) / stageW) * 100) - accWidthPct;
-  stage.querySelectorAll('[data-role="vessel"],[data-role="accessor"]').forEach(el => el.remove());
-  const vesImg = makeImg(vesselFile, {
-    position:'absolute', left: vesLeftPct.toFixed(2)+'%',
-    top:(SURFACE-20)+'%', width:vesWidthPct+'%', height:'22%',
-    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
-  });
-  vesImg.dataset.role = 'vessel';
-  stage.appendChild(vesImg);
-  const accImg = makeImg(accessorFile, {
-    position:'absolute', left: accLeftPct.toFixed(2)+'%',
-    top:(SURFACE-12)+'%', width:accWidthPct+'%', height:'14%',
-    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
-  });
-  accImg.dataset.role = 'accessor';
-  stage.appendChild(accImg);
-}
-
 function generate() {
   const palette = document.getElementById('palette').value;
   const furnitureChoice = document.getElementById('furnitureSelect').value;
   const tf = palette !== 'any' ? (a => a.tone === palette || a.tone === 'neutral') : null;
+
   let furn = furnitureChoice !== 'any'
     ? (ASSETS.furniture.find(f => f.file.startsWith(furnitureChoice)) || pick(ASSETS.furniture))
     : pick(ASSETS.furniture, tf);
+
   const includeLamp = Math.random() < 0.7;
   const lamp       = includeLamp ? pick(ASSETS.lamp, tf) : null;
   const plantLeft  = pick(ASSETS.plant, tf);
@@ -203,44 +178,70 @@ function generate() {
   const accessor   = pick(ASSETS.accessor, tf);
   const backdrop   = pick(ASSETS.backdrop, tf);
   const statement  = pick(ASSETS.statement, tf);
+
   const stage = document.getElementById('stage');
   stage.innerHTML = '';
+
+  // Backdrop
   stage.appendChild(makeImg(backdrop.file, {
-    position:'absolute', left:'0', top:'0', width:'100%', height:'100%',
+    position:'absolute', left:'0', top:'0',
+    width:'100%', height:'100%',
     objectFit:'cover', objectPosition:'center', zIndex:'1'
   }));
-  const furnImg = makeImg(furn.file, {
-    position:'absolute', left:'10%', top:SURFACE+'%',
+
+  // Furniture
+  stage.appendChild(makeImg(furn.file, {
+    position:'absolute', left:FURN_L+'%', top:SURFACE+'%',
     width:'80%', height:(100-SURFACE+4)+'%',
     objectFit:'contain', objectPosition:'top center', zIndex:'3'
-  });
-  furnImg.dataset.role = 'furniture';
-  furnImg.addEventListener('load', () => setTimeout(() => placeOnSurface(stage, vessel.file, accessor.file), 150));
-  stage.appendChild(furnImg);
+  }));
+
+  // Statement
   stage.appendChild(makeImg(statement.file, {
-    position:'absolute', left:'18%', top:'2%',
-    width:'64%', height:(SURFACE-8)+'%',
+    position:'absolute', left:'20%', top:'2%',
+    width:'60%', height:(SURFACE-8)+'%',
     objectFit:'contain', objectPosition:'bottom center', zIndex:'4'
   }));
+
+  // Plant LEFT — anchored to furniture left edge
   stage.appendChild(makeImg(plantLeft.file, {
-    position:'absolute', left:'1%', top:(SURFACE-40)+'%',
-    width:'20%', height:'42%',
+    position:'absolute', left:FURN_L+'%', top:(SURFACE-40)+'%',
+    width:ITEM_W+'%', height:'42%',
     objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
   }));
+
+  // Plant RIGHT — anchored to furniture right edge (no lamp)
   if (plantRight) {
     stage.appendChild(makeImg(plantRight.file, {
-      position:'absolute', right:'1%', top:(SURFACE-40)+'%',
-      width:'20%', height:'42%',
+      position:'absolute', left:(FURN_R-ITEM_W)+'%', top:(SURFACE-40)+'%',
+      width:ITEM_W+'%', height:'42%',
       objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
     }));
   }
+
+  // Lamp — anchored to furniture right edge
   if (lamp) {
     stage.appendChild(makeImg(lamp.file, {
-      position:'absolute', right:'2%', top:(SURFACE-42)+'%',
-      width:'19%', height:'44%',
+      position:'absolute', left:(FURN_R-ITEM_W)+'%', top:(SURFACE-42)+'%',
+      width:ITEM_W+'%', height:'44%',
       objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
     }));
   }
+
+  // Vessel — left of center
+  stage.appendChild(makeImg(vessel.file, {
+    position:'absolute', left:'26%', top:(SURFACE-20)+'%',
+    width:'13%', height:'22%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
+  }));
+
+  // Accessor — right of center
+  stage.appendChild(makeImg(accessor.file, {
+    position:'absolute', left:'61%', top:(SURFACE-12)+'%',
+    width:'13%', height:'14%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
+  }));
+
   const allItems = [backdrop, furn, statement, plantLeft, vessel, accessor,
     ...(plantRight ? [plantRight] : []), ...(lamp ? [lamp] : [])];
   const scores = applyLaws(allItems);
@@ -252,10 +253,15 @@ function generate() {
     p.textContent = (s.pass ? '✓ ' : '✗ ') + s.law;
     bar.appendChild(p);
   });
+
   const grid = document.getElementById('manifest-grid');
   grid.innerHTML = '';
-  const manifest = { backdrop, furniture: furn, statement, 'plant left': plantLeft,
-    vessel, accessor, ...(plantRight ? {'plant right':plantRight} : {}), ...(lamp ? {lamp} : {}) };
+  const manifest = {
+    backdrop, furniture: furn, statement,
+    'plant left': plantLeft, vessel, accessor,
+    ...(plantRight ? {'plant right': plantRight} : {}),
+    ...(lamp ? {lamp} : {})
+  };
   Object.entries(manifest).forEach(([role, asset]) => {
     const d = document.createElement('div');
     d.className = 'manifest-item';
