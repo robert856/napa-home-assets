@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Napa Home — Tablescape Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; }
+    .app { max-width: 600px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .header { margin-bottom: 1.75rem; }
+    .header h1 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; }
+    .header p { font-size: 14px; color: #666; margin-top: 5px; }
+    .controls { display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+    .controls select { font-size: 14px; padding: 9px 14px; border-radius: 8px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; min-width: 160px; cursor: pointer; }
+    .controls select:hover { border-color: #aaa; }
+    .btn-generate { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 9px 22px; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+    .btn-generate:hover { opacity: 0.82; }
+    .btn-secondary { background: transparent; color: #1a1a1a; border: 1px solid #ccc; border-radius: 8px; padding: 9px 18px; font-size: 14px; cursor: pointer; transition: background 0.15s; }
+    .btn-secondary:hover { background: #ebebeb; }
+    .stage-wrap { width: 100%; max-width: 520px; margin: 0 auto 1.25rem; }
+    .stage { position: relative; width: 100%; padding-top: 127.27%; overflow: hidden; border-radius: 12px; background: #e0ddd8; box-shadow: 0 4px 24px rgba(0,0,0,0.10); }
+    .stage img { position: absolute; display: block; }
+    .placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #999; font-size: 15px; }
+    .score-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .score-pill { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid #ddd; color: #666; background: #fff; }
+    .score-pill.pass { color: #0F6E56; background: #E1F5EE; border-color: #5DCAA5; }
+    .score-pill.fail { color: #993C1D; background: #FAECE7; border-color: #F0997B; }
+    .manifest { background: #fff; border-radius: 12px; border: 1px solid #e8e8e8; padding: 1.25rem; }
+    .manifest h3 { font-size: 11px; font-weight: 500; color: #999; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .manifest-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+    .manifest-item { font-size: 12px; color: #1a1a1a; padding: 8px 12px; background: #f9f9f7; border-radius: 8px; border: 1px solid #eee; word-break: break-all; line-height: 1.4; }
+    .manifest-item span { color: #999; font-size: 10px; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    footer { text-align: center; margin-top: 3rem; font-size: 12px; color: #bbb; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Napa Home — Tablescape Generator</h1>
+    <p>Intelligent compositions governed by the 7 laws of decorating</p>
+  </div>
+
+  <div class="controls">
+    <select id="palette">
+      <option value="any">Any palette</option>
+      <option value="warm">Warm tones</option>
+      <option value="cool">Cool tones</option>
+      <option value="neutral">Neutral only</option>
+    </select>
+    <select id="furnitureSelect">
+      <option value="any">Any furniture</option>
+      <option value="furniture_01">Dark wood chest</option>
+      <option value="furniture_02">White dresser</option>
+      <option value="furniture_03">Gray sideboard</option>
+    </select>
+    <button class="btn-generate" onclick="generate()">Generate composition</button>
+    <button class="btn-secondary" onclick="generate()">Shuffle ↺</button>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <div class="placeholder">Press "Generate composition" to begin</div>
+    </div>
+  </div>
+
+  <div class="score-bar" id="scores"></div>
+
+  <div class="manifest" id="manifest" style="display:none;">
+    <h3>Selected assets</h3>
+    <div class="manifest-grid" id="manifest-grid"></div>
+  </div>
+
+  <footer>Napa Home &copy; 2026 — Decorating Generator</footer>
+</div>
+
+<script>
+const BASE = 'https://cdn.jsdelivr.net/gh/robert856/napa-home-assets@main/';
+const SURFACE = 56;
+const INSET_PX = 25;
+
+const ASSETS = {
+  furniture: [
+    { file: 'furniture_01_mid_heavy_brown_warm_furniture.png', tone: 'warm', weight: 'heavy', height: 'mid' },
+    { file: 'furniture_02_mid_heavy_white_cool_furniture.png', tone: 'cool', weight: 'heavy', height: 'mid' },
+    { file: 'furniture_03_mid_heavy_gray_neutral_furniture.png', tone: 'neutral', weight: 'heavy', height: 'mid' },
+  ],
+  backdrop: [
+    { file: 'backdrop_01_tall_heavy_black_neutral_backdrop.png', tone: 'neutral', weight: 'heavy', height: 'tall' },
+    { file: 'backdrop_02_tall_heavy_black_neutral_backdrop.png', tone: 'neutral', weight: 'heavy', height: 'tall' },
+    { file: 'backdrop_03_tall_medium_gray_neutral_backdrop.png', tone: 'neutral', weight: 'medium', height: 'tall' },
+    { file: 'backdrop_04_tall_medium_gray_cool_backdrop.png', tone: 'cool', weight: 'medium', height: 'tall' },
+    { file: 'backdrop_05_tall_light_white_neutral_backdrop.png', tone: 'neutral', weight: 'light', height: 'tall' },
+    { file: 'backdrop_06_tall_light_white_cool_backdrop.png', tone: 'cool', weight: 'light', height: 'tall' },
+    { file: 'backdrop_07_tall_light_white_neutral_backdrop.png', tone: 'neutral', weight: 'light', height: 'tall' },
+  ],
+  statement: [
+    { file: 'mirror_01_tall_heavy_gold_warm_statement.png', tone: 'warm', weight: 'heavy', height: 'tall' },
+    { file: 'mirror_02_tall_medium_white_cool_statement.png', tone: 'cool', weight: 'medium', height: 'tall' },
+    { file: 'mirror_03_mid_medium_natural_warm_statement.png', tone: 'warm', weight: 'medium', height: 'mid' },
+    { file: 'picture_01_mid_medium_blue_cool_statement.png', tone: 'cool', weight: 'medium', height: 'mid' },
+    { file: 'picture_02_mid_light_pink_warm_statement.png', tone: 'warm', weight: 'light', height: 'mid' },
+    { file: 'picture_03_mid_medium_blue_cool_statement.png', tone: 'cool', weight: 'medium', height: 'mid' },
+    { file: 'center_01_mid_heavy_orange_warm_statement.png', tone: 'warm', weight: 'heavy', height: 'mid' },
+  ],
+  lamp: [
+    { file: 'lamp_01_tall_medium_white_neutral_vertical.png', tone: 'neutral', weight: 'medium', height: 'tall' },
+    { file: 'lamp_03_tall_heavy_blue_cool_vertical.png', tone: 'cool', weight: 'heavy', height: 'tall' },
+  ],
+  plant: [
+    { file: 'plant_01_mid_light_green_neutral_organic.png', tone: 'neutral', weight: 'light', height: 'mid' },
+    { file: 'plant_05_tall_medium_green_neutral_organic.png', tone: 'neutral', weight: 'medium', height: 'tall' },
+    { file: 'plant_09_mid_medium_blue_cool_organic.png', tone: 'cool', weight: 'medium', height: 'mid' },
+  ],
+  vessel: [
+    { file: 'vase_02_mid_heavy_orange_warm_vessel.png', tone: 'warm', weight: 'heavy', height: 'mid' },
+    { file: 'vase_03_mid_heavy_blue_cool_vessel.png', tone: 'cool', weight: 'heavy', height: 'mid' },
+  ],
+  accessor: [
+    { file: 'accessor_04_low_light_white_neutral_collector.png', tone: 'neutral', weight: 'light', height: 'low' },
+    { file: 'accessor_05_low_medium_blue_cool_collector.png', tone: 'cool', weight: 'medium', height: 'low' },
+    { file: 'accessor_06_low_medium_gold_warm_accent.png', tone: 'warm', weight: 'medium', height: 'low' },
+    { file: 'accessor_07_low_light_white_neutral_collector.png', tone: 'neutral', weight: 'light', height: 'low' },
+    { file: 'accessor_08_low_medium_gold_warm_accent.png', tone: 'warm', weight: 'medium', height: 'low' },
+    { file: 'accessor_09_low_light_white_neutral_accent.png', tone: 'neutral', weight: 'light', height: 'low' },
+  ],
+};
+
+function pick(arr, filter, exclude) {
+  let pool = filter ? arr.filter(filter) : [...arr];
+  if (exclude) pool = pool.filter(a => a.file !== exclude.file);
+  if (!pool.length) pool = exclude ? arr.filter(a => a.file !== exclude.file) : arr;
+  if (!pool.length) pool = arr;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function applyLaws(items) {
+  const count = items.length;
+  const heights = items.map(i => i.height);
+  const tones = items.map(i => i.tone);
+  const warm = tones.filter(t => t==='warm').length / count;
+  const cool = tones.filter(t => t==='cool').length / count;
+  return [
+    { law: 'Law 1 — odd numbers', pass: count % 2 !== 0 },
+    { law: 'Law 2 — triangle', pass: heights.includes('tall') && heights.includes('mid') && heights.includes('low') },
+    { law: 'Law 3 — 60/30/10', pass: warm <= 0.65 && cool <= 0.65 },
+    { law: 'Law 4 — organic texture', pass: items.some(i => i.file.includes('plant')) },
+    { law: 'Law 5 — earns its place', pass: true },
+    { law: 'Law 6 — breathing room', pass: count <= 8 },
+    { law: 'Law 7 — anchor', pass: items.filter(i => i.weight==='heavy').length >= 1 },
+  ];
+}
+
+function makeImg(file, styles) {
+  const img = document.createElement('img');
+  img.src = BASE + file;
+  Object.assign(img.style, styles);
+  img.onerror = () => { img.style.opacity = '0.05'; };
+  return img;
+}
+
+function placeOnSurface(stage, vesselFile, accessorFile) {
+  const furnImg = stage.querySelector('[data-role="furniture"]');
+  if (!furnImg) return;
+  const stageRect = stage.getBoundingClientRect();
+  const furnRect  = furnImg.getBoundingClientRect();
+  const stageW    = stageRect.width;
+  const furnLeftPx  = furnRect.left  - stageRect.left;
+  const furnRightPx = furnRect.right - stageRect.left;
+  const vesWidthPct = 15;
+  const accWidthPct = 16;
+  const vesLeftPct  = ((furnLeftPx + INSET_PX) / stageW) * 100;
+  const accLeftPct  = (((furnRightPx - INSET_PX) / stageW) * 100) - accWidthPct;
+  stage.querySelectorAll('[data-role="vessel"],[data-role="accessor"]').forEach(el => el.remove());
+  const vesImg = makeImg(vesselFile, {
+    position:'absolute', left: vesLeftPct.toFixed(2)+'%',
+    top:(SURFACE-20)+'%', width:vesWidthPct+'%', height:'22%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
+  });
+  vesImg.dataset.role = 'vessel';
+  stage.appendChild(vesImg);
+  const accImg = makeImg(accessorFile, {
+    position:'absolute', left: accLeftPct.toFixed(2)+'%',
+    top:(SURFACE-12)+'%', width:accWidthPct+'%', height:'14%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'6'
+  });
+  accImg.dataset.role = 'accessor';
+  stage.appendChild(accImg);
+}
+
+function generate() {
+  const palette = document.getElementById('palette').value;
+  const furnitureChoice = document.getElementById('furnitureSelect').value;
+  const tf = palette !== 'any' ? (a => a.tone === palette || a.tone === 'neutral') : null;
+  let furn = furnitureChoice !== 'any'
+    ? (ASSETS.furniture.find(f => f.file.startsWith(furnitureChoice)) || pick(ASSETS.furniture))
+    : pick(ASSETS.furniture, tf);
+  const includeLamp = Math.random() < 0.7;
+  const lamp       = includeLamp ? pick(ASSETS.lamp, tf) : null;
+  const plantLeft  = pick(ASSETS.plant, tf);
+  const plantRight = !includeLamp ? pick(ASSETS.plant, tf, plantLeft) : null;
+  const vessel     = pick(ASSETS.vessel, tf);
+  const accessor   = pick(ASSETS.accessor, tf);
+  const backdrop   = pick(ASSETS.backdrop, tf);
+  const statement  = pick(ASSETS.statement, tf);
+  const stage = document.getElementById('stage');
+  stage.innerHTML = '';
+  stage.appendChild(makeImg(backdrop.file, {
+    position:'absolute', left:'0', top:'0', width:'100%', height:'100%',
+    objectFit:'cover', objectPosition:'center', zIndex:'1'
+  }));
+  const furnImg = makeImg(furn.file, {
+    position:'absolute', left:'10%', top:SURFACE+'%',
+    width:'80%', height:(100-SURFACE+4)+'%',
+    objectFit:'contain', objectPosition:'top center', zIndex:'3'
+  });
+  furnImg.dataset.role = 'furniture';
+  furnImg.addEventListener('load', () => setTimeout(() => placeOnSurface(stage, vessel.file, accessor.file), 150));
+  stage.appendChild(furnImg);
+  stage.appendChild(makeImg(statement.file, {
+    position:'absolute', left:'18%', top:'2%',
+    width:'64%', height:(SURFACE-8)+'%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'4'
+  }));
+  stage.appendChild(makeImg(plantLeft.file, {
+    position:'absolute', left:'1%', top:(SURFACE-40)+'%',
+    width:'20%', height:'42%',
+    objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
+  }));
+  if (plantRight) {
+    stage.appendChild(makeImg(plantRight.file, {
+      position:'absolute', right:'1%', top:(SURFACE-40)+'%',
+      width:'20%', height:'42%',
+      objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
+    }));
+  }
+  if (lamp) {
+    stage.appendChild(makeImg(lamp.file, {
+      position:'absolute', right:'2%', top:(SURFACE-42)+'%',
+      width:'19%', height:'44%',
+      objectFit:'contain', objectPosition:'bottom center', zIndex:'5'
+    }));
+  }
+  const allItems = [backdrop, furn, statement, plantLeft, vessel, accessor,
+    ...(plantRight ? [plantRight] : []), ...(lamp ? [lamp] : [])];
+  const scores = applyLaws(allItems);
+  const bar = document.getElementById('scores');
+  bar.innerHTML = '';
+  scores.forEach(s => {
+    const p = document.createElement('div');
+    p.className = 'score-pill ' + (s.pass ? 'pass' : 'fail');
+    p.textContent = (s.pass ? '✓ ' : '✗ ') + s.law;
+    bar.appendChild(p);
+  });
+  const grid = document.getElementById('manifest-grid');
+  grid.innerHTML = '';
+  const manifest = { backdrop, furniture: furn, statement, 'plant left': plantLeft,
+    vessel, accessor, ...(plantRight ? {'plant right':plantRight} : {}), ...(lamp ? {lamp} : {}) };
+  Object.entries(manifest).forEach(([role, asset]) => {
+    const d = document.createElement('div');
+    d.className = 'manifest-item';
+    d.innerHTML = `<span>${role}</span>${asset.file.replace('.png','')}`;
+    grid.appendChild(d);
+  });
+  document.getElementById('manifest').style.display = 'block';
+}
+</script>
+</body>
+</html>
